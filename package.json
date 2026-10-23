@@ -1,0 +1,21 @@
+{
+  "name": "@guoyunhe/create",
+  "version": "0.1.0",
+  "description": "Initialize Node.js projects with Guo Yunhe's dev tools configuration",
+  "keywords": ["create", "cli", "editorconfig", "oxfmt", "oxlint", "husky", "lint-staged"],
+  "license": "GPL-3.0-only",
+  "author": "Guo Yunhe <i@guoyunhe.me>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/guoyunhe/create.git"
+  },
+  "type": "module",
+  "bin": "bin/create.js",
+  "files": ["bin", "src", "LICENSE"],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}
