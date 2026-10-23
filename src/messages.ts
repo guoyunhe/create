@@ -1,4 +1,20 @@
-export const en = {
+export interface Messages {
+  intro: string;
+  projectPath: string;
+  enableEditorConfig: string;
+  enableOxfmt: string;
+  enableOxlint: string;
+  enableVscode: string;
+  enableHuskyLintStaged: string;
+  installDependencies: string;
+  installing: string;
+  installFailed: string;
+  created: string;
+  updated: string;
+  done: string;
+}
+
+export const en: Messages = {
   intro: 'Initialize project with common dev tools',
   projectPath: 'Project directory',
   enableEditorConfig: 'Set up EditorConfig (@guoyunhe/editorconfig)?',
@@ -14,7 +30,7 @@ export const en = {
   done: 'Done! Happy coding.',
 };
 
-export const zh = {
+export const zh: Messages = {
   intro: '使用常用开发工具配置初始化项目',
   projectPath: '项目目录',
   enableEditorConfig: '配置 EditorConfig (@guoyunhe/editorconfig)？',
@@ -30,7 +46,7 @@ export const zh = {
   done: '完成！祝编码愉快。',
 };
 
-export function getMessages(env = process.env) {
+export function getMessages(env: NodeJS.ProcessEnv = process.env): Messages {
   const lang = env.LC_ALL || env.LC_MESSAGES || env.LANGUAGE || env.LANG || '';
   return lang.toLowerCase().startsWith('zh') ? zh : en;
 }

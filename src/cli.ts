@@ -4,8 +4,8 @@ import { chmod } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 
-import { createProject, detectPackageManager, installArgs } from '../src/index.js';
-import { getMessages } from '../src/messages.js';
+import { createProject, detectPackageManager, installArgs } from './index.ts';
+import { getMessages } from './messages.ts';
 
 const messages = getMessages();
 const args = process.argv.slice(2);
@@ -15,7 +15,7 @@ const target = args.find((arg) => !arg.startsWith('-')) ?? '.';
 
 const rl = yes ? null : createInterface({ input: process.stdin, output: process.stdout });
 
-async function confirm(message) {
+async function confirm(message: string): Promise<boolean> {
   if (!rl) return true;
   const answer = (await rl.question(`${message} (Y/n) `)).trim().toLowerCase();
   return answer === '' || answer === 'y' || answer === 'yes' || answer === '是';

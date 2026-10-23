@@ -50,30 +50,42 @@ const EXEC = {
   bun: 'bunx',
 };
 
-export function detectPackageManager(env = process.env) {
-  const name = (env.npm_config_user_agent || '').split('/')[0];
+export type PackageManager = keyof typeof EXEC;
+
+export function detectPackageManager(env: NodeJS.ProcessEnv = process.env): PackageManager {
+  const name = (env.npm_config_user_agent || '').split('/')[0] as PackageManager;
   return name in EXEC ? name : 'npm';
 }
 
-export function installArgs(pm, deps) {
+export function installArgs(pm: PackageManager, deps: string[]) {
   return pm === 'npm' ? ['install', '-D', ...deps] : ['add', '-D', ...deps];
 }
 
-async function readJson(path, fallback) {
+async function readJson(path: string, fallback: any): Promise<any> {
   try {
     return JSON.parse(await readFile(path, 'utf-8'));
-  } catch (err) {
+  } catch (err: any) {
     if (err.code === 'ENOENT') return fallback;
     throw err;
   }
 }
 
-const writeJson = (path, data) => writeFile(path, JSON.stringify(data, null, 2) + '\n', 'utf-8');
+const writeJson = (path: string, data: unknown) => writeFile(path, JSON.stringify(data, null, 2) + '\n', 'utf-8');
 
 /**
  * Write configuration files into the project. Returns the list of dev
  * dependencies that should be installed.
  */
+export interface CreateProjectOptions {
+  projectPath: string;
+  editorconfig?: boolean;
+  oxfmt?: boolean;
+  oxlint?: boolean;
+  vscode?: boolean;
+  huskyLintStaged?: boolean;
+  packageManager?: PackageManager;
+}
+
 export async function createProject({
   projectPath,
   editorconfig = true,
@@ -82,10 +94,10 @@ export async function createProject({
   vscode = true,
   huskyLintStaged = true,
   packageManager = 'npm',
-}) {
+}: CreateProjectOptions) {
   await mkdir(projectPath, { recursive: true });
-  const written = [];
-  const deps = [];
+  const written: string[] = [];
+  const deps: string[] = [];
   const packageJsonPath = join(projectPath, 'package.json');
   const packageJson = await readJson(packageJsonPath, {
     name: projectPath.split(/[\\/]/).filter(Boolean).pop(),
@@ -94,7 +106,7 @@ export async function createProject({
   });
   packageJson.scripts ||= {};
 
-  const write = async (file, content) => {
+  const write = async (file: string, content: string) => {
     const path = join(projectPath, file);
     await mkdir(join(path, '..'), { recursive: true });
     await writeFile(path, content, 'utf-8');

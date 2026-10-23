@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
-import { createProject, detectPackageManager } from './index.js';
-import { getMessages, zh, en } from './messages.js';
+import { createProject, detectPackageManager } from './index.ts';
+import { getMessages, zh, en } from './messages.ts';
 
 test('creates all configuration files', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'create-'));
