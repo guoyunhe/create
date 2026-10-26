@@ -8,7 +8,7 @@ import process from 'node:process';
 import * as p from '@clack/prompts';
 import { Command } from 'commander';
 
-import { createProject, detectPackageManager, installArgs } from './index.ts';
+import { createProject, detectPackageManager, installArgs, type OxlintConfig } from './index.ts';
 import { getMessages } from './messages.ts';
 
 const messages = getMessages();
@@ -39,8 +39,25 @@ async function confirm(message: string): Promise<boolean> {
   return answer;
 }
 
+async function selectOxlintConfigs(): Promise<OxlintConfig[]> {
+  const answer = await p.multiselect({
+    message: messages.selectOxlintConfigs,
+    options: [
+      { value: 'react', label: messages.oxlintReactConfig },
+      { value: 'jsx-a11y', label: messages.oxlintJsxA11yConfig },
+    ],
+    required: false,
+  });
+  if (p.isCancel(answer)) {
+    p.cancel(messages.cancelled);
+    process.exit(0);
+  }
+  return answer;
+}
+
 p.intro(`@guoyunhe/create - ${messages.intro}`);
 
+const oxlintConfigs: OxlintConfig[] = yes ? ['react', 'jsx-a11y'] : await selectOxlintConfigs();
 const projectPath = path.resolve(process.cwd(), target);
 const options = {
   projectPath,
@@ -48,6 +65,7 @@ const options = {
   editorconfig: true,
   oxfmt: true,
   oxlint: true,
+  oxlintConfigs,
   vscode: true,
   huskyLintStaged: true,
 };

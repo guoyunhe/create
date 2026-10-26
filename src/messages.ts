@@ -5,6 +5,9 @@ export interface Messages {
   projectPath: string;
   acceptAllDefaults: string;
   skipDependencyInstall: string;
+  selectOxlintConfigs: string;
+  oxlintReactConfig: string;
+  oxlintJsxA11yConfig: string;
   installDependencies: string;
   installing: string;
   installFailed: string;
@@ -17,8 +20,11 @@ export interface Messages {
 export const en: Messages = {
   intro: 'Initialize project with common dev tools',
   projectPath: 'Project directory',
-  acceptAllDefaults: 'Install dependencies without prompting',
+  acceptAllDefaults: 'Use all optional configs and install dependencies without prompting',
   skipDependencyInstall: 'Skip installing dependencies',
+  selectOxlintConfigs: 'Select optional oxlint-config-recommended presets',
+  oxlintReactConfig: 'React recommended rules',
+  oxlintJsxA11yConfig: 'jsx-a11y accessibility rules',
   installDependencies: 'Install dependencies now?',
   installing: 'Installing dependencies...',
   installFailed: 'Failed to install dependencies. Please install them manually.',
@@ -31,8 +37,11 @@ export const en: Messages = {
 export const zh: Messages = {
   intro: '使用常用开发工具配置初始化项目',
   projectPath: '项目目录',
-  acceptAllDefaults: '不经确认直接安装依赖',
+  acceptAllDefaults: '启用全部可选规则并直接安装依赖',
   skipDependencyInstall: '跳过安装依赖',
+  selectOxlintConfigs: '选择 oxlint-config-recommended 可选规则集',
+  oxlintReactConfig: 'React 推荐规则',
+  oxlintJsxA11yConfig: 'jsx-a11y 可访问性规则',
   installDependencies: '现在安装依赖？',
   installing: '正在安装依赖……',
   installFailed: '依赖安装失败，请手动安装。',

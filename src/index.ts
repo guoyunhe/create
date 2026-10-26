@@ -32,15 +32,33 @@ export default defineConfig({
 });
 `;
 
-export const OXLINT_CONFIG = `import { defineConfig } from 'oxlint';
-import recommended from 'oxlint-config-recommended';
-import recommendedReact from 'oxlint-config-recommended/react';
-import recommendedJsxA11y from 'oxlint-config-recommended/jsx-a11y';
+export type OxlintConfig = 'react' | 'jsx-a11y';
 
+const OXLINT_CONFIG_IMPORTS: Record<OxlintConfig, string> = {
+  react: "import recommendedReact from 'oxlint-config-recommended/react';",
+  'jsx-a11y': "import recommendedJsxA11y from 'oxlint-config-recommended/jsx-a11y';",
+};
+
+const OXLINT_CONFIG_PRESETS: Record<OxlintConfig, string> = {
+  react: 'recommendedReact',
+  'jsx-a11y': 'recommendedJsxA11y',
+};
+
+export function createOxlintConfig(configs: readonly OxlintConfig[]) {
+  const optionalImports = configs.map((config) => OXLINT_CONFIG_IMPORTS[config]).join('\n');
+  const extendsValue = [
+    'recommended',
+    ...configs.map((config) => OXLINT_CONFIG_PRESETS[config]),
+  ].join(', ');
+
+  return `import { defineConfig } from 'oxlint';
+import recommended from 'oxlint-config-recommended';
+${optionalImports}${optionalImports ? '\n' : ''}
 export default defineConfig({
-  extends: [recommended, recommendedReact, recommendedJsxA11y],
+  extends: [${extendsValue}],
 });
 `;
+}
 
 export const LINT_STAGED_KEY =
   '*.{js,mjs,cjs,ts,mts,cts,jsx,tsx,vue,json,jsonc,css,scss,less,htm,html,md,mdx,yaml,yml}';
@@ -109,6 +127,7 @@ export interface CreateProjectOptions {
   editorconfig?: boolean;
   oxfmt?: boolean;
   oxlint?: boolean;
+  oxlintConfigs?: OxlintConfig[];
   vscode?: boolean;
   huskyLintStaged?: boolean;
   packageManager?: PackageManager;
@@ -119,6 +138,7 @@ export async function createProject({
   editorconfig = true,
   oxfmt = true,
   oxlint = true,
+  oxlintConfigs = ['react', 'jsx-a11y'],
   vscode = true,
   huskyLintStaged = true,
   packageManager = 'npm',
@@ -156,7 +176,7 @@ export async function createProject({
   if (oxlint) {
     deps.push('oxlint', 'oxlint-config-recommended');
     packageJson.scripts.lint = 'oxlint';
-    await write('oxlint.config.ts', OXLINT_CONFIG);
+    await write('oxlint.config.ts', createOxlintConfig(oxlintConfigs));
   }
 
   if (vscode) {

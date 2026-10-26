@@ -25,6 +25,21 @@ test('creates all configuration files', async () => {
   await readFile(path.join(dir, '.vscode/settings.json'));
 });
 
+test('includes only selected optional oxlint presets', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'create-'));
+  await createProject({
+    projectPath: dir,
+    editorconfig: false,
+    oxfmt: false,
+    vscode: false,
+    huskyLintStaged: false,
+    oxlintConfigs: ['react'],
+  });
+  const oxlintConfig = await readFile(path.join(dir, 'oxlint.config.ts'), 'utf8');
+  assert.match(oxlintConfig, /oxlint-config-recommended\/react/);
+  assert.doesNotMatch(oxlintConfig, /jsx-a11y/);
+});
+
 test('detects package manager and locale', () => {
   assert.equal(detectPackageManager({ npm_config_user_agent: 'pnpm/9 npm/?' }), 'pnpm');
   assert.equal(detectPackageManager({}), 'npm');

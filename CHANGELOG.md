@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - Use `@clack/prompts` for the CLI interface and Commander for argument parsing and help output.
 - Add a `pnpm dev` script to run the CLI locally with tsx.
 - Initialize EditorConfig, VS Code, lint-staged, oxfmt, and oxlint without individual prompts.
+- Ask which optional React and jsx-a11y Oxlint presets to include.
 
 ### Fixed
 
