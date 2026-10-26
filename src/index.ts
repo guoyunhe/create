@@ -31,12 +31,13 @@ export default defineConfig({
 });
 `;
 
-// TODO: use @guoyunhe/oxlint-config once it is published
 export const OXLINT_CONFIG = `import { defineConfig } from 'oxlint';
-// import preset from '@guoyunhe/oxlint-config';
+import recommended from 'oxlint-config-recommended';
+import recommendedReact from 'oxlint-config-recommended/react';
+import recommendedJsxA11y from 'oxlint-config-recommended/jsx-a11y';
 
 export default defineConfig({
-  // ...preset,
+  extends: [recommended, recommendedReact, recommendedJsxA11y],
 });
 `;
 
@@ -126,7 +127,7 @@ export async function createProject({
   }
 
   if (oxlint) {
-    deps.push('oxlint');
+    deps.push('oxlint', 'oxlint-config-recommended');
     packageJson.scripts.lint = 'oxlint';
     await write('oxlint.config.ts', OXLINT_CONFIG);
   }

@@ -14,9 +14,14 @@ test('creates all configuration files', async () => {
   assert.equal(pkg.scripts.prepare, 'husky');
   assert.ok(pkg['lint-staged']);
   assert.ok(deps.includes('@guoyunhe/oxfmt-config'));
+  assert.ok(deps.includes('oxlint'));
+  assert.ok(deps.includes('oxlint-config-recommended'));
   assert.match(await readFile(join(dir, '.husky/pre-commit'), 'utf-8'), /lint-staged/);
   await readFile(join(dir, '.editorconfig'));
   await readFile(join(dir, 'oxfmt.config.ts'));
+  const oxlintConfig = await readFile(join(dir, 'oxlint.config.ts'), 'utf-8');
+  assert.match(oxlintConfig, /oxlint-config-recommended\/react/);
+  assert.match(oxlintConfig, /oxlint-config-recommended\/jsx-a11y/);
   await readFile(join(dir, '.vscode/settings.json'));
 });
 

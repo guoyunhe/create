@@ -12,7 +12,7 @@ npm init @guoyunhe my-project
 Options: `--yes` (accept all defaults), `--no-install` (skip installing dependencies).
 
 Sets up EditorConfig (`@guoyunhe/editorconfig`), oxfmt (`@guoyunhe/oxfmt-config`), oxlint
-(`@guoyunhe/oxlint-config`, placeholder until published), VS Code settings, and husky + lint-staged.
+(`oxlint-config-recommended`, including its React and jsx-a11y configs), VS Code settings, and husky + lint-staged.
 
 Messages are shown in Chinese when `LANG` starts with `zh`, otherwise English.
 
@@ -24,4 +24,4 @@ Messages are shown in Chinese when `LANG` starts with `zh`, otherwise English.
 npm init @guoyunhe
 ```
 
-使用常用开发工具配置初始化项目：EditorConfig、oxfmt、oxlint（`@guoyunhe/oxlint-config` 尚未发布，目前为占位）、VS Code、husky 与 lint-staged。
+使用常用开发工具配置初始化项目：EditorConfig、oxfmt、oxlint（`oxlint-config-recommended`，包含 React 和 jsx-a11y 配置）、VS Code、husky 与 lint-staged。

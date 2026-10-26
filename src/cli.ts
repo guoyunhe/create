@@ -2,26 +2,41 @@
 import { spawnSync } from 'node:child_process';
 import { chmod } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { createInterface } from 'node:readline/promises';
 
+import * as p from '@clack/prompts';
+import { Command } from 'commander';
 import { createProject, detectPackageManager, installArgs } from './index.ts';
 import { getMessages } from './messages.ts';
 
 const messages = getMessages();
-const args = process.argv.slice(2);
-const yes = args.includes('--yes') || args.includes('-y') || !process.stdin.isTTY;
-const noInstall = args.includes('--no-install');
-const target = args.find((arg) => !arg.startsWith('-')) ?? '.';
+const program = new Command();
+program
+  .name('@guoyunhe/create')
+  .description(messages.intro)
+  .argument('[project-directory]', messages.projectPath, '.')
+  .option('-y, --yes', messages.acceptAllDefaults)
+  .option('--no-install', messages.skipDependencyInstall)
+  .parse(process.argv);
 
-const rl = yes ? null : createInterface({ input: process.stdin, output: process.stdout });
+const { yes: acceptAllDefaults, install } = program.opts<{
+  yes?: boolean;
+  install?: boolean;
+}>();
+const yes = acceptAllDefaults || !process.stdin.isTTY;
+const noInstall = install === false;
+const target = program.args[0] ?? '.';
 
 async function confirm(message: string): Promise<boolean> {
-  if (!rl) return true;
-  const answer = (await rl.question(`${message} (Y/n) `)).trim().toLowerCase();
-  return answer === '' || answer === 'y' || answer === 'yes' || answer === '是';
+  if (yes) return true;
+  const answer = await p.confirm({ message, initialValue: true });
+  if (p.isCancel(answer)) {
+    p.cancel(messages.cancelled);
+    process.exit(0);
+  }
+  return answer;
 }
 
-console.log(`\n@guoyunhe/create - ${messages.intro}\n`);
+p.intro(`@guoyunhe/create - ${messages.intro}`);
 
 const projectPath = resolve(process.cwd(), target);
 const options = {
@@ -38,10 +53,10 @@ const { written, deps } = await createProject(options);
 if (options.huskyLintStaged) {
   await chmod(join(projectPath, '.husky', 'pre-commit'), 0o755);
 }
-for (const file of written) console.log(`  ${messages.created}: ${file}`);
+for (const file of written) p.log.success(`${messages.created}: ${file}`);
 
 if (deps.length > 0 && !noInstall && (await confirm(messages.installDependencies))) {
-  console.log(`\n${messages.installing}`);
+  p.log.info(messages.installing);
   const result = spawnSync(options.packageManager, installArgs(options.packageManager, deps), {
     cwd: projectPath,
     stdio: 'inherit',
@@ -50,5 +65,4 @@ if (deps.length > 0 && !noInstall && (await confirm(messages.installDependencies
   if (result.status !== 0) console.error(messages.installFailed);
 }
 
-rl?.close();
-console.log(`\n${messages.done}`);
+p.outro(messages.done);

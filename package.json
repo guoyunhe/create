@@ -26,6 +26,10 @@
   "engines": {
     "node": ">=20"
   },
+  "dependencies": {
+    "@clack/prompts": "^1.8.1",
+    "commander": "^15.0.0"
+  },
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
