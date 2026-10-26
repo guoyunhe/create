@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { createProject, detectPackageManager } from './index.ts';
+import { createProject, detectPackageManager, EDITORCONFIG } from './index.ts';
 import { getMessages, zh, en } from './messages.ts';
 
 test('creates all configuration files', async () => {
@@ -17,7 +17,7 @@ test('creates all configuration files', async () => {
   assert.ok(deps.includes('oxlint'));
   assert.ok(deps.includes('oxlint-config-recommended'));
   assert.match(await readFile(path.join(dir, '.husky/pre-commit'), 'utf8'), /lint-staged/);
-  await readFile(path.join(dir, '.editorconfig'));
+  assert.equal(await readFile(path.join(dir, '.editorconfig'), 'utf8'), EDITORCONFIG);
   await readFile(path.join(dir, 'oxfmt.config.ts'));
   const oxlintConfig = await readFile(path.join(dir, 'oxlint.config.ts'), 'utf8');
   assert.match(oxlintConfig, /oxlint-config-recommended\/react/);

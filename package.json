@@ -36,10 +36,10 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.8.1",
+    "@guoyunhe/editorconfig": "^0.3.0",
     "commander": "^15.0.0"
   },
   "devDependencies": {
-    "@guoyunhe/editorconfig": "^0.3.0",
     "@guoyunhe/oxfmt-config": "^1.1.0",
     "@types/node": "^26.6.5",
     "husky": "^9.1.7",

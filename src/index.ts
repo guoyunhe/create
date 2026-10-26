@@ -1,28 +1,12 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import module from 'node:module';
 import path from 'node:path';
 import process from 'node:process';
 
-export const EDITORCONFIG = `# https://editorconfig.org
-# Based on @guoyunhe/editorconfig
-
-root = true
-
-[*]
-charset = utf-8
-end_of_line = lf
-indent_size = 2
-indent_style = space
-insert_final_newline = true
-max_line_length = 100
-trim_trailing_whitespace = true
-
-[{package-lock.json,yarn.lock,pnpm-lock.yaml}]
-insert_final_newline = ignore
-
-[*.md]
-max_line_length = off
-trim_trailing_whitespace = false
-`;
+export const EDITORCONFIG = await readFile(
+  module.createRequire(import.meta.url).resolve('@guoyunhe/editorconfig/node/.editorconfig'),
+  'utf8',
+);
 
 export const OXFMT_CONFIG = `import { defineConfig } from 'oxfmt';
 import preset from '@guoyunhe/oxfmt-config';

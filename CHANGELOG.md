@@ -11,7 +11,4 @@ All notable changes to this project will be documented in this file.
 - Add a `pnpm dev` script to run the CLI locally with tsx.
 - Initialize EditorConfig, VS Code, lint-staged, oxfmt, and oxlint without individual prompts.
 - Ask which optional React and jsx-a11y Oxlint presets to include.
-
-### Fixed
-
-- Fix Oxlint errors in the project source and tests.
+- Read the generated `.editorconfig` from `@guoyunhe/editorconfig`.
