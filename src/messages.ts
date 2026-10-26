@@ -1,13 +1,10 @@
+import process from 'node:process';
+
 export interface Messages {
   intro: string;
   projectPath: string;
   acceptAllDefaults: string;
   skipDependencyInstall: string;
-  enableEditorConfig: string;
-  enableOxfmt: string;
-  enableOxlint: string;
-  enableVscode: string;
-  enableHuskyLintStaged: string;
   installDependencies: string;
   installing: string;
   installFailed: string;
@@ -20,13 +17,8 @@ export interface Messages {
 export const en: Messages = {
   intro: 'Initialize project with common dev tools',
   projectPath: 'Project directory',
-  acceptAllDefaults: 'Accept all defaults',
+  acceptAllDefaults: 'Install dependencies without prompting',
   skipDependencyInstall: 'Skip installing dependencies',
-  enableEditorConfig: 'Set up EditorConfig (@guoyunhe/editorconfig)?',
-  enableOxfmt: 'Set up oxfmt (@guoyunhe/oxfmt-config)?',
-  enableOxlint: 'Set up oxlint (oxlint-config-recommended)?',
-  enableVscode: 'Set up VS Code settings?',
-  enableHuskyLintStaged: 'Set up husky and lint-staged?',
   installDependencies: 'Install dependencies now?',
   installing: 'Installing dependencies...',
   installFailed: 'Failed to install dependencies. Please install them manually.',
@@ -39,13 +31,8 @@ export const en: Messages = {
 export const zh: Messages = {
   intro: '使用常用开发工具配置初始化项目',
   projectPath: '项目目录',
-  acceptAllDefaults: '接受所有默认选项',
+  acceptAllDefaults: '不经确认直接安装依赖',
   skipDependencyInstall: '跳过安装依赖',
-  enableEditorConfig: '配置 EditorConfig (@guoyunhe/editorconfig)？',
-  enableOxfmt: '配置 oxfmt (@guoyunhe/oxfmt-config)？',
-  enableOxlint: '配置 oxlint (oxlint-config-recommended)？',
-  enableVscode: '配置 VS Code 设置？',
-  enableHuskyLintStaged: '配置 husky 和 lint-staged？',
   installDependencies: '现在安装依赖？',
   installing: '正在安装依赖……',
   installFailed: '依赖安装失败，请手动安装。',

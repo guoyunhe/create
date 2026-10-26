@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
+import console from 'node:console';
 import { chmod } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import path from 'node:path';
+import process from 'node:process';
 
 import * as p from '@clack/prompts';
 import { Command } from 'commander';
+
 import { createProject, detectPackageManager, installArgs } from './index.ts';
 import { getMessages } from './messages.ts';
 
@@ -38,21 +41,19 @@ async function confirm(message: string): Promise<boolean> {
 
 p.intro(`@guoyunhe/create - ${messages.intro}`);
 
-const projectPath = resolve(process.cwd(), target);
+const projectPath = path.resolve(process.cwd(), target);
 const options = {
   projectPath,
   packageManager: detectPackageManager(),
-  editorconfig: await confirm(messages.enableEditorConfig),
-  oxfmt: await confirm(messages.enableOxfmt),
-  oxlint: await confirm(messages.enableOxlint),
-  vscode: await confirm(messages.enableVscode),
-  huskyLintStaged: await confirm(messages.enableHuskyLintStaged),
+  editorconfig: true,
+  oxfmt: true,
+  oxlint: true,
+  vscode: true,
+  huskyLintStaged: true,
 };
 
 const { written, deps } = await createProject(options);
-if (options.huskyLintStaged) {
-  await chmod(join(projectPath, '.husky', 'pre-commit'), 0o755);
-}
+await chmod(path.join(projectPath, '.husky', 'pre-commit'), 0o755);
 for (const file of written) p.log.success(`${messages.created}: ${file}`);
 
 if (deps.length > 0 && !noInstall && (await confirm(messages.installDependencies))) {

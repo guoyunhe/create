@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import path from 'node:path';
+import process from 'node:process';
 
 export const EDITORCONFIG = `# https://editorconfig.org
 # Based on @guoyunhe/editorconfig
@@ -62,20 +63,46 @@ export function installArgs(pm: PackageManager, deps: string[]) {
   return pm === 'npm' ? ['install', '-D', ...deps] : ['add', '-D', ...deps];
 }
 
-async function readJson(path: string, fallback: any): Promise<any> {
+type JsonRecord = Record<string, unknown>;
+
+interface PackageJson extends JsonRecord {
+  name?: string;
+  version?: string;
+  private?: boolean;
+  scripts?: Record<string, string>;
+  'lint-staged'?: Record<string, string | string[]>;
+}
+
+interface VscodeSettings extends JsonRecord {
+  'editor.formatOnSave'?: boolean;
+  'editor.defaultFormatter'?: string;
+  'editor.rulers'?: number[];
+  'oxc.enable'?: boolean;
+}
+
+interface VscodeExtensions extends JsonRecord {
+  recommendations?: string[];
+}
+
+async function readJson<T extends JsonRecord>(filePath: string, fallback: T): Promise<T> {
   try {
-    return JSON.parse(await readFile(path, 'utf-8'));
-  } catch (err: any) {
-    if (err.code === 'ENOENT') return fallback;
-    throw err;
+    const parsed: unknown = JSON.parse(await readFile(filePath, 'utf8'));
+    if (!(parsed instanceof Object) || Array.isArray(parsed)) {
+      throw new TypeError(`Expected a JSON object in ${filePath}`);
+    }
+    return parsed as T;
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return fallback;
+    throw error;
   }
 }
 
-const writeJson = (path: string, data: unknown) => writeFile(path, JSON.stringify(data, null, 2) + '\n', 'utf-8');
+const writeJson = (filePath: string, data: JsonRecord) =>
+  writeFile(filePath, `${JSON.stringify(data, undefined, 2)}\n`, 'utf8');
 
 /**
- * Write configuration files into the project. Returns the list of dev
- * dependencies that should be installed.
+ * Write configuration files into the project. Returns the list of dev dependencies that should be
+ * installed.
  */
 export interface CreateProjectOptions {
   projectPath: string;
@@ -99,18 +126,18 @@ export async function createProject({
   await mkdir(projectPath, { recursive: true });
   const written: string[] = [];
   const deps: string[] = [];
-  const packageJsonPath = join(projectPath, 'package.json');
-  const packageJson = await readJson(packageJsonPath, {
-    name: projectPath.split(/[\\/]/).filter(Boolean).pop(),
+  const packageJsonPath = path.join(projectPath, 'package.json');
+  const packageJson = await readJson<PackageJson>(packageJsonPath, {
+    name: path.basename(projectPath) || undefined,
     version: '0.0.0',
     private: true,
   });
   packageJson.scripts ||= {};
 
   const write = async (file: string, content: string) => {
-    const path = join(projectPath, file);
-    await mkdir(join(path, '..'), { recursive: true });
-    await writeFile(path, content, 'utf-8');
+    const filePath = path.join(projectPath, file);
+    await mkdir(path.join(filePath, '..'), { recursive: true });
+    await writeFile(filePath, content, 'utf8');
     written.push(file);
   };
 
@@ -133,8 +160,8 @@ export async function createProject({
   }
 
   if (vscode) {
-    const path = join(projectPath, '.vscode', 'settings.json');
-    const settings = await readJson(path, {});
+    const settingsPath = path.join(projectPath, '.vscode', 'settings.json');
+    const settings = await readJson<VscodeSettings>(settingsPath, {});
     if (oxfmt) {
       settings['editor.formatOnSave'] = true;
       settings['editor.defaultFormatter'] = 'oxc.oxc-vscode';
@@ -143,14 +170,13 @@ export async function createProject({
     if (oxlint) {
       settings['oxc.enable'] = true;
     }
-    await mkdir(join(projectPath, '.vscode'), { recursive: true });
-    await writeJson(path, settings);
+    await mkdir(path.join(projectPath, '.vscode'), { recursive: true });
+    await writeJson(settingsPath, settings);
     written.push('.vscode/settings.json');
 
-    const extPath = join(projectPath, '.vscode', 'extensions.json');
-    const ext = await readJson(extPath, {});
-    const recommendations = new Set(ext.recommendations || []);
-    recommendations.add('editorconfig.editorconfig');
+    const extPath = path.join(projectPath, '.vscode', 'extensions.json');
+    const ext = await readJson<VscodeExtensions>(extPath, {});
+    const recommendations = new Set([...(ext.recommendations || []), 'editorconfig.editorconfig']);
     if (oxfmt || oxlint) recommendations.add('oxc.oxc-vscode');
     ext.recommendations = [...recommendations];
     await writeJson(extPath, ext);
@@ -163,9 +189,9 @@ export async function createProject({
     const commands = [];
     if (oxfmt) commands.push('oxfmt --write');
     if (oxlint) commands.push('oxlint --fix');
-    if (commands.length) {
+    if (commands.length > 0) {
       packageJson['lint-staged'] ||= {};
-      packageJson['lint-staged'][LINT_STAGED_KEY] = commands.length === 1 ? commands[0] : commands;
+      packageJson['lint-staged'][LINT_STAGED_KEY] = commands.length > 1 ? commands : commands[0];
     }
     await write('.husky/pre-commit', `${EXEC[packageManager] || 'npx'} lint-staged\n`);
   }
