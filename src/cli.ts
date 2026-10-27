@@ -29,9 +29,9 @@ const yes = acceptAllDefaults || !process.stdin.isTTY;
 const noInstall = install === false;
 const target = program.args[0] ?? '.';
 
-async function confirm(message: string): Promise<boolean> {
+async function confirm(message: string, initialValue = true): Promise<boolean> {
   if (yes) return true;
-  const answer = await p.confirm({ message, initialValue: true });
+  const answer = await p.confirm({ message, initialValue });
   if (p.isCancel(answer)) {
     p.cancel(messages.cancelled);
     process.exit(0);
@@ -58,6 +58,7 @@ async function selectOxlintConfigs(): Promise<OxlintConfig[]> {
 p.intro(`@guoyunhe/create - ${messages.intro}`);
 
 const oxlintConfigs: OxlintConfig[] = yes ? ['react', 'jsx-a11y'] : await selectOxlintConfigs();
+const stylelint = yes ? true : await confirm(messages.enableStylelint, false);
 const projectPath = path.resolve(process.cwd(), target);
 const options = {
   projectPath,
@@ -66,6 +67,7 @@ const options = {
   oxfmt: true,
   oxlint: true,
   oxlintConfigs,
+  stylelint,
   vscode: true,
   huskyLintStaged: true,
 };

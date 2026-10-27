@@ -8,6 +8,7 @@ export interface Messages {
   selectOxlintConfigs: string;
   oxlintReactConfig: string;
   oxlintJsxA11yConfig: string;
+  enableStylelint: string;
   installDependencies: string;
   installing: string;
   installFailed: string;
@@ -25,6 +26,7 @@ export const en: Messages = {
   selectOxlintConfigs: 'Select optional oxlint-config-recommended presets',
   oxlintReactConfig: 'React recommended rules',
   oxlintJsxA11yConfig: 'jsx-a11y accessibility rules',
+  enableStylelint: 'Enable Stylelint for CSS?',
   installDependencies: 'Install dependencies now?',
   installing: 'Installing dependencies...',
   installFailed: 'Failed to install dependencies. Please install them manually.',
@@ -42,6 +44,7 @@ export const zh: Messages = {
   selectOxlintConfigs: '选择 oxlint-config-recommended 可选规则集',
   oxlintReactConfig: 'React 推荐规则',
   oxlintJsxA11yConfig: 'jsx-a11y 可访问性规则',
+  enableStylelint: '启用 CSS 的 Stylelint？',
   installDependencies: '现在安装依赖？',
   installing: '正在安装依赖……',
   installFailed: '依赖安装失败，请手动安装。',

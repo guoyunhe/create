@@ -47,7 +47,8 @@ export default defineConfig({
 export const LINT_STAGED_KEY =
   '*.{js,mjs,cjs,ts,mts,cts,jsx,tsx,vue,json,jsonc,css,scss,less,htm,html,md,mdx,yaml,yml}';
 const OXLINT_LINT_STAGED_KEY = '*.{js,mjs,cjs,ts,mts,cts,jsx,tsx,vue}';
-const FORMAT_ONLY_LINT_STAGED_KEY = '*.{json,jsonc,css,scss,less,htm,html,md,mdx,yaml,yml}';
+const STYLELINT_LINT_STAGED_KEY = '*.css';
+const FORMAT_ONLY_LINT_STAGED_KEY = '*.{json,jsonc,scss,less,htm,html,md,mdx,yaml,yml}';
 
 const EXEC = {
   npm: 'npx',
@@ -114,6 +115,7 @@ export interface CreateProjectOptions {
   oxfmt?: boolean;
   oxlint?: boolean;
   oxlintConfigs?: OxlintConfig[];
+  stylelint?: boolean;
   vscode?: boolean;
   huskyLintStaged?: boolean;
   packageManager?: PackageManager;
@@ -125,6 +127,7 @@ export async function createProject({
   oxfmt = true,
   oxlint = true,
   oxlintConfigs = ['react', 'jsx-a11y'],
+  stylelint = false,
   vscode = true,
   huskyLintStaged = true,
   packageManager = 'npm',
@@ -165,6 +168,20 @@ export async function createProject({
     await write('oxlint.config.ts', createOxlintConfig(oxlintConfigs));
   }
 
+  if (stylelint) {
+    deps.push('stylelint', 'stylelint-config-standard');
+    packageJson.scripts.lint = oxlint ? 'oxlint && stylelint "**/*.css"' : 'stylelint "**/*.css"';
+    await write(
+      'stylelint.config.ts',
+      `import type { Config } from 'stylelint';
+
+export default {
+  extends: ['stylelint-config-standard'],
+} satisfies Config;
+`,
+    );
+  }
+
   if (vscode) {
     const settingsPath = path.join(projectPath, '.vscode', 'settings.json');
     const settings = await readJson<VscodeSettings>(settingsPath, {});
@@ -184,6 +201,7 @@ export async function createProject({
     const ext = await readJson<VscodeExtensions>(extPath, {});
     const recommendations = new Set([...(ext.recommendations || []), 'editorconfig.editorconfig']);
     if (oxfmt || oxlint) recommendations.add('oxc.oxc-vscode');
+    if (stylelint) recommendations.add('stylelint.vscode-stylelint');
     ext.recommendations = [...recommendations];
     await writeJson(extPath, ext);
     written.push('.vscode/extensions.json');
@@ -192,18 +210,24 @@ export async function createProject({
   if (huskyLintStaged) {
     deps.push('husky', 'lint-staged');
     packageJson.scripts.prepare = 'husky';
-    const commands = [];
-    if (oxfmt) commands.push('oxfmt --write');
-    if (oxlint) commands.push('oxlint --fix');
-    if (commands.length > 0) {
-      const lintStaged = (packageJson['lint-staged'] ||= {});
-      if (oxfmt && oxlint) {
-        lintStaged[OXLINT_LINT_STAGED_KEY] = commands;
-        lintStaged[FORMAT_ONLY_LINT_STAGED_KEY] = 'oxfmt --write';
-      } else {
-        const key = oxlint ? OXLINT_LINT_STAGED_KEY : LINT_STAGED_KEY;
-        lintStaged[key] = commands.length > 1 ? commands : commands[0];
-      }
+    const lintStaged =
+      oxfmt || oxlint || stylelint ? (packageJson['lint-staged'] ||= {}) : undefined;
+    const codeCommands = [];
+    if (oxfmt) codeCommands.push('oxfmt --write');
+    if (oxlint) codeCommands.push('oxlint --fix');
+    if (codeCommands.length > 0 && lintStaged) {
+      lintStaged[OXLINT_LINT_STAGED_KEY] = codeCommands.length > 1 ? codeCommands : codeCommands[0];
+    }
+
+    const cssCommands = [];
+    if (oxfmt) cssCommands.push('oxfmt --write');
+    if (stylelint) cssCommands.push('stylelint --fix');
+    if (cssCommands.length > 0 && lintStaged) {
+      lintStaged[STYLELINT_LINT_STAGED_KEY] = cssCommands.length > 1 ? cssCommands : cssCommands[0];
+    }
+
+    if (oxfmt && lintStaged) {
+      lintStaged[FORMAT_ONLY_LINT_STAGED_KEY] = 'oxfmt --write';
     }
     await write('.husky/pre-commit', `${EXEC[packageManager] || 'npx'} lint-staged\n`);
   }

@@ -13,12 +13,15 @@ test('creates all configuration files', async () => {
   const pkg = JSON.parse(await readFile(path.join(dir, 'package.json'), 'utf8'));
   assert.equal(pkg.scripts.prepare, 'husky');
   assert.ok(pkg['lint-staged']);
+  assert.ok(!deps.includes('stylelint'));
+  assert.ok(!deps.includes('stylelint-config-standard'));
   assert.deepEqual(pkg['lint-staged']['*.{js,mjs,cjs,ts,mts,cts,jsx,tsx,vue}'], [
     'oxfmt --write',
     'oxlint --fix',
   ]);
+  assert.equal(pkg['lint-staged']['*.css'], 'oxfmt --write');
   assert.equal(
-    pkg['lint-staged']['*.{json,jsonc,css,scss,less,htm,html,md,mdx,yaml,yml}'],
+    pkg['lint-staged']['*.{json,jsonc,scss,less,htm,html,md,mdx,yaml,yml}'],
     'oxfmt --write',
   );
   assert.ok(deps.includes('@guoyunhe/oxfmt-config'));
@@ -31,6 +34,25 @@ test('creates all configuration files', async () => {
   assert.match(oxlintConfig, /oxlint-config-recommended\/react/);
   assert.match(oxlintConfig, /oxlint-config-recommended\/jsx-a11y/);
   await readFile(path.join(dir, '.vscode/settings.json'));
+});
+
+test('creates Stylelint configuration when enabled', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'create-'));
+  const { deps } = await createProject({
+    projectPath: dir,
+    stylelint: true,
+  });
+  const pkg = JSON.parse(await readFile(path.join(dir, 'package.json'), 'utf8'));
+  assert.ok(deps.includes('stylelint'));
+  assert.ok(deps.includes('stylelint-config-standard'));
+  assert.equal(pkg.scripts.lint, 'oxlint && stylelint "**/*.css"');
+  assert.deepEqual(pkg['lint-staged']['*.css'], ['oxfmt --write', 'stylelint --fix']);
+  assert.match(
+    await readFile(path.join(dir, 'stylelint.config.ts'), 'utf8'),
+    /stylelint-config-standard/,
+  );
+  const extensions = JSON.parse(await readFile(path.join(dir, '.vscode/extensions.json'), 'utf8'));
+  assert.ok(extensions.recommendations.includes('stylelint.vscode-stylelint'));
 });
 
 test('includes only selected optional oxlint presets', async () => {
