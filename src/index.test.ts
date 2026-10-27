@@ -13,6 +13,14 @@ test('creates all configuration files', async () => {
   const pkg = JSON.parse(await readFile(path.join(dir, 'package.json'), 'utf8'));
   assert.equal(pkg.scripts.prepare, 'husky');
   assert.ok(pkg['lint-staged']);
+  assert.deepEqual(pkg['lint-staged']['*.{js,mjs,cjs,ts,mts,cts,jsx,tsx,vue}'], [
+    'oxfmt --write',
+    'oxlint --fix',
+  ]);
+  assert.equal(
+    pkg['lint-staged']['*.{json,jsonc,css,scss,less,htm,html,md,mdx,yaml,yml}'],
+    'oxfmt --write',
+  );
   assert.ok(deps.includes('@guoyunhe/oxfmt-config'));
   assert.ok(deps.includes('oxlint'));
   assert.ok(deps.includes('oxlint-config-recommended'));

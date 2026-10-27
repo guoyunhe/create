@@ -20,7 +20,8 @@
   "bin": "dist/cli.mjs",
   "files": [
     "dist",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "type": "module",
   "scripts": {
@@ -30,7 +31,7 @@
     "format:check": "oxfmt --check .",
     "lint": "oxlint",
     "prepare": "husky",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "pnpm build",
     "test": "node --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },
@@ -52,10 +53,11 @@
     "typescript": "^7.0.2"
   },
   "lint-staged": {
-    "*.{js,mjs,cjs,ts,mts,cts,jsx,tsx,vue,json,jsonc,css,scss,less,htm,html,md,mdx,yaml,yml}": [
+    "*.{js,mjs,cjs,ts,mts,cts,jsx,tsx,vue}": [
       "oxfmt --write",
       "oxlint --fix"
-    ]
+    ],
+    "*.{json,jsonc,css,scss,less,htm,html,md,mdx,yaml,yml}": "oxfmt --write"
   },
   "devEngines": {
     "packageManager": {

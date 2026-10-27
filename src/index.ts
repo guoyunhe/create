@@ -46,6 +46,8 @@ export default defineConfig({
 
 export const LINT_STAGED_KEY =
   '*.{js,mjs,cjs,ts,mts,cts,jsx,tsx,vue,json,jsonc,css,scss,less,htm,html,md,mdx,yaml,yml}';
+const OXLINT_LINT_STAGED_KEY = '*.{js,mjs,cjs,ts,mts,cts,jsx,tsx,vue}';
+const FORMAT_ONLY_LINT_STAGED_KEY = '*.{json,jsonc,css,scss,less,htm,html,md,mdx,yaml,yml}';
 
 const EXEC = {
   npm: 'npx',
@@ -194,8 +196,14 @@ export async function createProject({
     if (oxfmt) commands.push('oxfmt --write');
     if (oxlint) commands.push('oxlint --fix');
     if (commands.length > 0) {
-      packageJson['lint-staged'] ||= {};
-      packageJson['lint-staged'][LINT_STAGED_KEY] = commands.length > 1 ? commands : commands[0];
+      const lintStaged = (packageJson['lint-staged'] ||= {});
+      if (oxfmt && oxlint) {
+        lintStaged[OXLINT_LINT_STAGED_KEY] = commands;
+        lintStaged[FORMAT_ONLY_LINT_STAGED_KEY] = 'oxfmt --write';
+      } else {
+        const key = oxlint ? OXLINT_LINT_STAGED_KEY : LINT_STAGED_KEY;
+        lintStaged[key] = commands.length > 1 ? commands : commands[0];
+      }
     }
     await write('.husky/pre-commit', `${EXEC[packageManager] || 'npx'} lint-staged\n`);
   }
