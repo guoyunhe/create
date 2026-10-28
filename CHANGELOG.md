@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-10-28
+
+### Added
+
+- Configure VS Code to apply Oxlint fixes on save and Stylelint fixes when enabled.
+
+### Changed
+
+- Remove existing ESLint dependencies, scripts, configuration, VS Code settings/recommendations, and lint-staged commands in favor of Oxlint.
+
 ## [0.3.1] - 2026-10-28
 
 ### Fixed
