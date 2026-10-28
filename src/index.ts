@@ -74,6 +74,8 @@ interface PackageJson extends JsonRecord {
   name?: string;
   version?: string;
   private?: boolean;
+  author?: string | { name: string; email: string; url: string };
+  funding?: string;
   scripts?: Record<string, string>;
   'lint-staged'?: Record<string, string | string[]>;
   dependencies?: Record<string, string>;
@@ -278,6 +280,12 @@ export async function createProject({
   for (const file of cleaned) {
     if (!updated.includes(file)) updated.push(file);
   }
+  packageJson.author = {
+    name: 'Guo Yunhe',
+    email: 'i@guoyunhe.me',
+    url: 'https://guoyunhe.me/',
+  };
+  packageJson.funding = 'https://ko-fi.com/guoyunhe';
   packageJson.scripts ||= {};
 
   const write = async (file: string, content: string) => {

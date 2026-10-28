@@ -14,6 +14,12 @@ test('creates all configuration files', async () => {
   assert.deepEqual(updated, []);
   const pkg = JSON.parse(await readFile(path.join(dir, 'package.json'), 'utf8'));
   assert.equal(pkg.scripts.prepare, 'husky');
+  assert.deepEqual(pkg.author, {
+    name: 'Guo Yunhe',
+    email: 'i@guoyunhe.me',
+    url: 'https://guoyunhe.me/',
+  });
+  assert.equal(pkg.funding, 'https://ko-fi.com/guoyunhe');
   assert.ok(pkg['lint-staged']);
   assert.ok(!deps.includes('stylelint'));
   assert.ok(!deps.includes('stylelint-config-standard'));
