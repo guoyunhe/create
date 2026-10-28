@@ -92,7 +92,9 @@ test('creates all configuration files', async () => {
   const oxlintConfig = await readFile(path.join(dir, 'oxlint.config.ts'), 'utf8');
   assert.match(oxlintConfig, /oxlint-config-recommended\/react/);
   assert.match(oxlintConfig, /oxlint-config-recommended\/jsx-a11y/);
-  await readFile(path.join(dir, '.vscode/settings.json'));
+  const settings = JSON.parse(await readFile(path.join(dir, '.vscode/settings.json'), 'utf8'));
+  assert.equal(settings['oxc.enable'], true);
+  assert.equal(settings['editor.codeActionsOnSave']['source.fixAll.oxc'], 'always');
 });
 
 test('removes existing Prettier and ESLint configuration while preserving unrelated settings', async () => {
@@ -192,6 +194,7 @@ test('removes existing Prettier and ESLint configuration while preserving unrela
   assert.equal(settings['editor.tabSize'], 2);
   assert.deepEqual(settings['editor.codeActionsOnSave'], {
     'source.organizeImports': 'explicit',
+    'source.fixAll.oxc': 'always',
   });
   assert.deepEqual(settings['[typescript]'], {
     'editor.tabSize': 4,
@@ -238,6 +241,9 @@ test('creates Stylelint configuration when enabled', async () => {
   );
   const extensions = JSON.parse(await readFile(path.join(dir, '.vscode/extensions.json'), 'utf8'));
   assert.ok(extensions.recommendations.includes('stylelint.vscode-stylelint'));
+  const settings = JSON.parse(await readFile(path.join(dir, '.vscode/settings.json'), 'utf8'));
+  assert.equal(settings['editor.codeActionsOnSave']['source.fixAll.oxc'], 'always');
+  assert.equal(settings['editor.codeActionsOnSave']['source.fixAll.stylelint'], 'explicit');
 });
 
 test('includes only selected optional oxlint presets', async () => {

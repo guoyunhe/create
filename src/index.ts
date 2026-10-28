@@ -94,6 +94,7 @@ interface PackageJson extends JsonRecord {
 interface VscodeSettings extends JsonRecord {
   'editor.formatOnSave'?: boolean;
   'editor.defaultFormatter'?: string;
+  'editor.codeActionsOnSave'?: JsonRecord;
   'editor.rulers'?: number[];
   'oxc.enable'?: boolean;
 }
@@ -499,6 +500,15 @@ export default {
     }
     if (oxlint) {
       settings['oxc.enable'] = true;
+    }
+    if (oxlint || stylelint) {
+      const codeActionsOnSave =
+        settings['editor.codeActionsOnSave'] === undefined
+          ? {}
+          : asRecord(settings['editor.codeActionsOnSave'], 'editor.codeActionsOnSave');
+      if (oxlint) codeActionsOnSave['source.fixAll.oxc'] = 'always';
+      if (stylelint) codeActionsOnSave['source.fixAll.stylelint'] = 'explicit';
+      settings['editor.codeActionsOnSave'] = codeActionsOnSave;
     }
     await mkdir(path.join(projectPath, '.vscode'), { recursive: true });
     await write('.vscode/settings.json', `${JSON.stringify(settings, undefined, 2)}\n`);
