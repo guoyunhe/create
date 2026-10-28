@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-28
+
+### Added
+
+- Add optional Stylelint configuration for CSS.
+- Remove existing Prettier configuration from `package.json`, VS Code settings and recommendations, and root config files.
+- Report generated files separately as created or updated.
+
 ## [0.1.0] - 2026-10-26
 
 ### Added
