@@ -1,6 +1,6 @@
 {
   "name": "@guoyunhe/create",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Initialize Node.js projects with Guo Yunhe's dev tools configuration",
   "keywords": [
     "cli",

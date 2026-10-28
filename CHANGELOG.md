@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-28
+
+### Added
+
+- Add author and funding metadata to generated `package.json` files.
+- Generate pnpm and Node.js engine requirements from current release data.
+- Update pnpm before installing dependencies.
+
+### Changed
+
+- Validate release versions with `semver`.
+
 ## [0.2.0] - 2026-10-28
 
 ### Added
