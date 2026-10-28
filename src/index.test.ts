@@ -2,10 +2,54 @@ import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { test } from 'node:test';
+import { afterEach, beforeEach, mock, test } from 'node:test';
 
 import { createProject, detectPackageManager, EDITORCONFIG } from './index.ts';
 import { getMessages, zh, en } from './messages.ts';
+
+beforeEach(() => {
+  mock.method(globalThis, 'fetch', async (input: Parameters<typeof globalThis.fetch>[0]) => {
+    const url = input instanceof globalThis.Request ? input.url : String(input);
+    if (url === 'https://registry.npmjs.org/pnpm/latest') {
+      return globalThis.Response.json({ version: '12.14.0' });
+    }
+    if (url === 'https://endoflife.date/api/v1/products/nodejs') {
+      return globalThis.Response.json({
+        result: {
+          releases: [
+            {
+              name: '22',
+              releaseDate: '2024-04-24',
+              isEol: false,
+              latest: { name: '22.17.1' },
+            },
+            {
+              name: '24',
+              releaseDate: '2025-05-06',
+              isEol: false,
+              latest: { name: '24.5.0' },
+            },
+            {
+              name: '21',
+              releaseDate: '2023-10-17',
+              isEol: true,
+              latest: { name: '21.7.3' },
+            },
+            {
+              name: '27',
+              releaseDate: '2099-01-01',
+              isEol: false,
+              latest: { name: '27.0.0' },
+            },
+          ],
+        },
+      });
+    }
+    throw new Error(`Unexpected API request: ${url}`);
+  });
+});
+
+afterEach(() => mock.restoreAll());
 
 test('creates all configuration files', async () => {
   const dir = await mkdtemp(path.join(tmpdir(), 'create-'));
@@ -20,6 +64,13 @@ test('creates all configuration files', async () => {
     url: 'https://guoyunhe.me/',
   });
   assert.equal(pkg.funding, 'https://ko-fi.com/guoyunhe');
+  assert.deepEqual(pkg.devEngines.packageManager, {
+    name: 'pnpm',
+    version: '>=12.14.0',
+    onFail: 'error',
+  });
+  assert.equal(pkg.engines.node, '^24.5.0 || ^22.17.1');
+  assert.equal(pkg.packageManager, undefined);
   assert.ok(pkg['lint-staged']);
   assert.ok(!deps.includes('stylelint'));
   assert.ok(!deps.includes('stylelint-config-standard'));
@@ -51,6 +102,9 @@ test('removes existing Prettier configuration while preserving unrelated setting
     path.join(dir, 'package.json'),
     JSON.stringify({
       prettier: { singleQuote: true },
+      packageManager: 'pnpm@9.0.0',
+      devEngines: { runtime: { name: 'node' } },
+      engines: { npm: '>=8' },
       scripts: { format: 'prettier --write .', test: 'vitest' },
       dependencies: { prettier: '^3.0.0', react: '^19.0.0' },
       'lint-staged': { '*.ts': ['prettier --write', 'eslint --fix'] },
@@ -91,6 +145,12 @@ test('removes existing Prettier configuration while preserving unrelated setting
   assert.equal(pkg.scripts.test, 'vitest');
   assert.equal(pkg.dependencies.prettier, undefined);
   assert.equal(pkg.dependencies.react, '^19.0.0');
+  assert.equal(pkg.packageManager, undefined);
+  assert.deepEqual(pkg.devEngines, {
+    runtime: { name: 'node' },
+    packageManager: { name: 'pnpm', version: '>=12.14.0', onFail: 'error' },
+  });
+  assert.deepEqual(pkg.engines, { npm: '>=8', node: '^24.5.0 || ^22.17.1' });
   assert.deepEqual(pkg['lint-staged']['*.ts'], ['eslint --fix']);
 
   const settings = JSON.parse(await readFile(path.join(dir, '.vscode/settings.json'), 'utf8'));

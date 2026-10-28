@@ -3,6 +3,8 @@ import module from 'node:module';
 import path from 'node:path';
 import process from 'node:process';
 
+import { parse as parseSemver } from 'semver';
+
 export const EDITORCONFIG = await readFile(
   module.createRequire(import.meta.url).resolve('@guoyunhe/editorconfig/node/.editorconfig'),
   'utf8',
@@ -57,6 +59,9 @@ const EXEC = {
   bun: 'bunx',
 };
 
+const PNPM_LATEST_API = 'https://registry.npmjs.org/pnpm/latest';
+const NODE_RELEASES_API = 'https://endoflife.date/api/v1/products/nodejs';
+
 export type PackageManager = keyof typeof EXEC;
 
 export function detectPackageManager(env: NodeJS.ProcessEnv = process.env): PackageManager {
@@ -76,6 +81,8 @@ interface PackageJson extends JsonRecord {
   private?: boolean;
   author?: string | { name: string; email: string; url: string };
   funding?: string;
+  devEngines?: JsonRecord & { packageManager?: JsonRecord };
+  engines?: Record<string, string>;
   scripts?: Record<string, string>;
   'lint-staged'?: Record<string, string | string[]>;
   dependencies?: Record<string, string>;
@@ -93,6 +100,107 @@ interface VscodeSettings extends JsonRecord {
 
 interface VscodeExtensions extends JsonRecord {
   recommendations?: string[];
+}
+
+function asRecord(value: unknown, description: string): JsonRecord {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError(`Expected ${description} to be an object`);
+  }
+  return value as JsonRecord;
+}
+
+function parseVersion(value: unknown, description: string) {
+  const version = typeof value === 'string' ? parseSemver(value) : undefined;
+  if (
+    !version ||
+    version.raw !== version.version ||
+    version.prerelease.length > 0 ||
+    version.build.length > 0
+  ) {
+    throw new TypeError(`Expected ${description} to be a stable semantic version`);
+  }
+  return version;
+}
+
+function isDate(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+    !Number.isNaN(Date.parse(`${value}T00:00:00Z`))
+  );
+}
+
+async function fetchJson(url: string): Promise<unknown> {
+  const response = await globalThis.fetch(url, {
+    signal: globalThis.AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+  }
+  return response.json() as Promise<unknown>;
+}
+
+async function getRuntimeRequirements() {
+  const [pnpmResponse, nodeResponse] = await Promise.all([
+    fetchJson(PNPM_LATEST_API),
+    fetchJson(NODE_RELEASES_API),
+  ]);
+  const pnpmVersion = parseVersion(
+    asRecord(pnpmResponse, 'pnpm API response').version,
+    'pnpm version',
+  ).version;
+  const nodeProduct = asRecord(
+    asRecord(nodeResponse, 'Node.js API response').result,
+    'Node.js product data',
+  );
+  const nodeReleases = nodeProduct.releases;
+  if (!Array.isArray(nodeReleases)) {
+    throw new TypeError('Expected Node.js product data to contain a releases array');
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const supportedReleases = nodeReleases
+    .map((item, index) => {
+      const release = asRecord(item, `Node.js release ${index}`);
+      const cycle = release.name;
+      const latest = parseVersion(
+        asRecord(release.latest, `Node.js release ${index} latest version`).name,
+        `Node.js release ${index} version`,
+      );
+      const cycleNumber = typeof cycle === 'string' ? Number(cycle) : Number.NaN;
+      const releaseDate = release.releaseDate;
+      const isEol = release.isEol;
+      if (
+        typeof cycle !== 'string' ||
+        !/^\d+$/.test(cycle) ||
+        !Number.isSafeInteger(cycleNumber) ||
+        latest.major !== cycleNumber ||
+        !isDate(releaseDate) ||
+        typeof isEol !== 'boolean'
+      ) {
+        throw new TypeError(`Invalid Node.js release data at index ${index}`);
+      }
+
+      return {
+        cycle: cycleNumber,
+        latest: latest.version,
+        releaseDate,
+        isEol,
+      };
+    })
+    .filter(({ releaseDate, isEol }) => releaseDate <= today && !isEol)
+    // filter() creates a local array, so sorting it cannot mutate the API response.
+    // oxlint-disable-next-line unicorn/no-array-sort
+    .sort((a, b) => b.cycle - a.cycle);
+
+  if (supportedReleases.length === 0) {
+    throw new Error('Node.js API returned no supported, non-EOL releases');
+  }
+
+  return {
+    pnpmVersion,
+    nodeVersionRange: supportedReleases.map(({ latest }) => `^${latest}`).join(' || '),
+  };
 }
 
 async function readJson<T extends JsonRecord>(filePath: string, fallback: T): Promise<T> {
@@ -266,6 +374,7 @@ export async function createProject({
   huskyLintStaged = true,
   packageManager = 'npm',
 }: CreateProjectOptions) {
+  const { pnpmVersion, nodeVersionRange } = await getRuntimeRequirements();
   await mkdir(projectPath, { recursive: true });
   const created: string[] = [];
   const updated: string[] = [];
@@ -286,6 +395,15 @@ export async function createProject({
     url: 'https://guoyunhe.me/',
   };
   packageJson.funding = 'https://ko-fi.com/guoyunhe';
+  delete packageJson.packageManager;
+  packageJson.devEngines ||= {};
+  packageJson.devEngines.packageManager = {
+    name: 'pnpm',
+    version: `>=${pnpmVersion}`,
+    onFail: 'error',
+  };
+  packageJson.engines ||= {};
+  packageJson.engines.node = nodeVersionRange;
   packageJson.scripts ||= {};
 
   const write = async (file: string, content: string) => {
