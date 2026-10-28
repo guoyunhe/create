@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises';
 import module from 'node:module';
 import path from 'node:path';
 import process from 'node:process';
@@ -76,6 +76,10 @@ interface PackageJson extends JsonRecord {
   private?: boolean;
   scripts?: Record<string, string>;
   'lint-staged'?: Record<string, string | string[]>;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  optionalDependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
 }
 
 interface VscodeSettings extends JsonRecord {
@@ -104,6 +108,107 @@ async function readJson<T extends JsonRecord>(filePath: string, fallback: T): Pr
 
 const writeJson = (filePath: string, data: JsonRecord) =>
   writeFile(filePath, `${JSON.stringify(data, undefined, 2)}\n`, 'utf8');
+
+async function removePrettierConfig(projectPath: string, packageJson: PackageJson) {
+  const removed: string[] = [];
+  delete packageJson.prettier;
+
+  for (const field of [
+    'dependencies',
+    'devDependencies',
+    'optionalDependencies',
+    'peerDependencies',
+  ] as const) {
+    const dependencies = packageJson[field];
+    if (!dependencies) continue;
+    for (const name of Object.keys(dependencies)) {
+      if (/(^|[-/])prettier($|[-/])/i.test(name)) delete dependencies[name];
+    }
+    if (Object.keys(dependencies).length === 0) delete packageJson[field];
+  }
+
+  if (packageJson.scripts) {
+    for (const [name, command] of Object.entries(packageJson.scripts)) {
+      if (/prettier/i.test(name) || /\bprettier\b/i.test(command)) delete packageJson.scripts[name];
+    }
+  }
+
+  const lintStaged = packageJson['lint-staged'];
+  if (lintStaged) {
+    for (const [pattern, commands] of Object.entries(lintStaged)) {
+      let remaining: string[];
+      if (Array.isArray(commands)) {
+        remaining = commands.filter((command) => !/\bprettier\b/i.test(command));
+      } else {
+        remaining = /\bprettier\b/i.test(commands) ? [] : [commands];
+      }
+      if (remaining.length === 0) {
+        delete lintStaged[pattern];
+      } else {
+        lintStaged[pattern] = Array.isArray(commands) ? remaining : remaining[0];
+      }
+    }
+    if (Object.keys(lintStaged).length === 0) delete packageJson['lint-staged'];
+  }
+
+  for (const file of await readdir(projectPath, { withFileTypes: true })) {
+    if (
+      file.isFile() &&
+      (/^\.prettier/i.test(file.name) || /^prettier\.config\./i.test(file.name))
+    ) {
+      await unlink(path.join(projectPath, file.name));
+      removed.push(file.name);
+    }
+  }
+
+  const vscodePath = path.join(projectPath, '.vscode');
+  let vscodeFiles: string[] = [];
+  try {
+    vscodeFiles = await readdir(vscodePath);
+  } catch (error: unknown) {
+    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
+  }
+  if (vscodeFiles.includes('settings.json')) {
+    const settingsPath = path.join(vscodePath, 'settings.json');
+    const settings = await readJson<VscodeSettings>(settingsPath, {});
+    for (const key of Object.keys(settings)) {
+      if (/^prettier(?:\.|$)/i.test(key)) delete settings[key];
+      if (!/^(?:\[[^\]]+\])+$/.test(key)) continue;
+
+      const value = settings[key];
+      if (!(value instanceof Object) || Array.isArray(value)) continue;
+
+      const languageSettings = value as JsonRecord;
+      for (const languageSetting of Object.keys(languageSettings)) {
+        if (
+          /^prettier(?:\.|$)/i.test(languageSetting) ||
+          (languageSetting === 'editor.defaultFormatter' &&
+            /prettier/i.test(String(languageSettings[languageSetting] || '')))
+        ) {
+          delete languageSettings[languageSetting];
+        }
+      }
+      if (Object.keys(languageSettings).length === 0) delete settings[key];
+    }
+    if (/prettier/i.test(String(settings['editor.defaultFormatter'] || ''))) {
+      delete settings['editor.defaultFormatter'];
+    }
+    await writeJson(settingsPath, settings);
+  }
+
+  if (vscodeFiles.includes('extensions.json')) {
+    const extensionsPath = path.join(vscodePath, 'extensions.json');
+    const extensions = await readJson<VscodeExtensions>(extensionsPath, {});
+    if (extensions.recommendations) {
+      extensions.recommendations = extensions.recommendations.filter(
+        (extension) => !/prettier/i.test(extension),
+      );
+      await writeJson(extensionsPath, extensions);
+    }
+  }
+
+  return removed;
+}
 
 /**
  * Write configuration files into the project. Returns the list of dev dependencies that should be
@@ -141,6 +246,7 @@ export async function createProject({
     version: '0.0.0',
     private: true,
   });
+  const removed = await removePrettierConfig(projectPath, packageJson);
   packageJson.scripts ||= {};
 
   const write = async (file: string, content: string) => {
@@ -235,5 +341,5 @@ export default {
   await writeJson(packageJsonPath, packageJson);
   written.push('package.json');
 
-  return { written, deps };
+  return { written, removed, deps };
 }
