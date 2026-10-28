@@ -72,9 +72,10 @@ const options = {
   huskyLintStaged: true,
 };
 
-const { written, deps } = await createProject(options);
+const { created, updated, deps } = await createProject(options);
 await chmod(path.join(projectPath, '.husky', 'pre-commit'), 0o755);
-for (const file of written) p.log.success(`${messages.created}: ${file}`);
+for (const file of created) p.log.success(`${messages.created}: ${file}`);
+for (const file of updated) p.log.success(`${messages.updated}: ${file}`);
 
 if (deps.length > 0 && !noInstall && (await confirm(messages.installDependencies))) {
   p.log.info(messages.installing);

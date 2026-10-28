@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises';
 import module from 'node:module';
 import path from 'node:path';
 import process from 'node:process';
@@ -109,8 +109,19 @@ async function readJson<T extends JsonRecord>(filePath: string, fallback: T): Pr
 const writeJson = (filePath: string, data: JsonRecord) =>
   writeFile(filePath, `${JSON.stringify(data, undefined, 2)}\n`, 'utf8');
 
+async function fileExists(filePath: string) {
+  try {
+    await access(filePath);
+    return true;
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
 async function removePrettierConfig(projectPath: string, packageJson: PackageJson) {
   const removed: string[] = [];
+  const updated: string[] = [];
   delete packageJson.prettier;
 
   for (const field of [
@@ -171,8 +182,12 @@ async function removePrettierConfig(projectPath: string, packageJson: PackageJso
   if (vscodeFiles.includes('settings.json')) {
     const settingsPath = path.join(vscodePath, 'settings.json');
     const settings = await readJson<VscodeSettings>(settingsPath, {});
+    let settingsChanged = false;
     for (const key of Object.keys(settings)) {
-      if (/^prettier(?:\.|$)/i.test(key)) delete settings[key];
+      if (/^prettier(?:\.|$)/i.test(key)) {
+        delete settings[key];
+        settingsChanged = true;
+      }
       if (!/^(?:\[[^\]]+\])+$/.test(key)) continue;
 
       const value = settings[key];
@@ -186,33 +201,45 @@ async function removePrettierConfig(projectPath: string, packageJson: PackageJso
             /prettier/i.test(String(languageSettings[languageSetting] || '')))
         ) {
           delete languageSettings[languageSetting];
+          settingsChanged = true;
         }
       }
-      if (Object.keys(languageSettings).length === 0) delete settings[key];
+      if (Object.keys(languageSettings).length === 0) {
+        delete settings[key];
+        settingsChanged = true;
+      }
     }
     if (/prettier/i.test(String(settings['editor.defaultFormatter'] || ''))) {
       delete settings['editor.defaultFormatter'];
+      settingsChanged = true;
     }
-    await writeJson(settingsPath, settings);
+    if (settingsChanged) {
+      await writeJson(settingsPath, settings);
+      updated.push('.vscode/settings.json');
+    }
   }
 
   if (vscodeFiles.includes('extensions.json')) {
     const extensionsPath = path.join(vscodePath, 'extensions.json');
     const extensions = await readJson<VscodeExtensions>(extensionsPath, {});
     if (extensions.recommendations) {
-      extensions.recommendations = extensions.recommendations.filter(
+      const recommendations = extensions.recommendations.filter(
         (extension) => !/prettier/i.test(extension),
       );
-      await writeJson(extensionsPath, extensions);
+      if (recommendations.length !== extensions.recommendations.length) {
+        extensions.recommendations = recommendations;
+        await writeJson(extensionsPath, extensions);
+        updated.push('.vscode/extensions.json');
+      }
     }
   }
 
-  return removed;
+  return { removed, updated };
 }
 
 /**
- * Write configuration files into the project. Returns the list of dev dependencies that should be
- * installed.
+ * Write configuration files into the project. Returns created/updated/removed files and dev
+ * dependencies that should be installed.
  */
 export interface CreateProjectOptions {
   projectPath: string;
@@ -238,7 +265,8 @@ export async function createProject({
   packageManager = 'npm',
 }: CreateProjectOptions) {
   await mkdir(projectPath, { recursive: true });
-  const written: string[] = [];
+  const created: string[] = [];
+  const updated: string[] = [];
   const deps: string[] = [];
   const packageJsonPath = path.join(projectPath, 'package.json');
   const packageJson = await readJson<PackageJson>(packageJsonPath, {
@@ -246,14 +274,19 @@ export async function createProject({
     version: '0.0.0',
     private: true,
   });
-  const removed = await removePrettierConfig(projectPath, packageJson);
+  const { removed, updated: cleaned } = await removePrettierConfig(projectPath, packageJson);
+  for (const file of cleaned) {
+    if (!updated.includes(file)) updated.push(file);
+  }
   packageJson.scripts ||= {};
 
   const write = async (file: string, content: string) => {
     const filePath = path.join(projectPath, file);
+    const existed = await fileExists(filePath);
     await mkdir(path.join(filePath, '..'), { recursive: true });
     await writeFile(filePath, content, 'utf8');
-    written.push(file);
+    const files = existed ? updated : created;
+    if (!files.includes(file)) files.push(file);
   };
 
   if (editorconfig) {
@@ -300,8 +333,7 @@ export default {
       settings['oxc.enable'] = true;
     }
     await mkdir(path.join(projectPath, '.vscode'), { recursive: true });
-    await writeJson(settingsPath, settings);
-    written.push('.vscode/settings.json');
+    await write('.vscode/settings.json', `${JSON.stringify(settings, undefined, 2)}\n`);
 
     const extPath = path.join(projectPath, '.vscode', 'extensions.json');
     const ext = await readJson<VscodeExtensions>(extPath, {});
@@ -309,8 +341,7 @@ export default {
     if (oxfmt || oxlint) recommendations.add('oxc.oxc-vscode');
     if (stylelint) recommendations.add('stylelint.vscode-stylelint');
     ext.recommendations = [...recommendations];
-    await writeJson(extPath, ext);
-    written.push('.vscode/extensions.json');
+    await write('.vscode/extensions.json', `${JSON.stringify(ext, undefined, 2)}\n`);
   }
 
   if (huskyLintStaged) {
@@ -338,8 +369,12 @@ export default {
     await write('.husky/pre-commit', `${EXEC[packageManager] || 'npx'} lint-staged\n`);
   }
 
-  await writeJson(packageJsonPath, packageJson);
-  written.push('package.json');
+  await write('package.json', `${JSON.stringify(packageJson, undefined, 2)}\n`);
 
-  return { written, removed, deps };
+  return {
+    created,
+    updated,
+    removed,
+    deps,
+  };
 }

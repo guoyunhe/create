@@ -9,7 +9,9 @@ import { getMessages, zh, en } from './messages.ts';
 
 test('creates all configuration files', async () => {
   const dir = await mkdtemp(path.join(tmpdir(), 'create-'));
-  const { deps } = await createProject({ projectPath: dir });
+  const { created, updated, deps } = await createProject({ projectPath: dir });
+  assert.ok(created.includes('package.json'));
+  assert.deepEqual(updated, []);
   const pkg = JSON.parse(await readFile(path.join(dir, 'package.json'), 'utf8'));
   assert.equal(pkg.scripts.prepare, 'husky');
   assert.ok(pkg['lint-staged']);
@@ -72,7 +74,11 @@ test('removes existing Prettier configuration while preserving unrelated setting
   await writeFile(path.join(dir, '.prettierignore'), 'dist\n');
   await writeFile(path.join(dir, 'prettier.config.cjs'), 'module.exports = {};');
 
-  const { removed } = await createProject({ projectPath: dir });
+  const { created, removed, updated } = await createProject({ projectPath: dir });
+  assert.ok(created.includes('.editorconfig'));
+  assert.ok(updated.includes('package.json'));
+  assert.ok(updated.includes('.vscode/settings.json'));
+  assert.ok(updated.includes('.vscode/extensions.json'));
   const pkg = JSON.parse(await readFile(path.join(dir, 'package.json'), 'utf8'));
   assert.equal(pkg.prettier, undefined);
   assert.equal(pkg.scripts.format, 'oxfmt --write .');
