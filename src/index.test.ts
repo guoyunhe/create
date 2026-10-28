@@ -95,31 +95,51 @@ test('creates all configuration files', async () => {
   await readFile(path.join(dir, '.vscode/settings.json'));
 });
 
-test('removes existing Prettier configuration while preserving unrelated settings', async () => {
+test('removes existing Prettier and ESLint configuration while preserving unrelated settings', async () => {
   const dir = await mkdtemp(path.join(tmpdir(), 'create-'));
   await mkdir(path.join(dir, '.vscode'));
   await writeFile(
     path.join(dir, 'package.json'),
     JSON.stringify({
       prettier: { singleQuote: true },
+      eslintConfig: { extends: ['eslint:recommended'] },
+      eslintIgnore: ['dist'],
       packageManager: 'pnpm@9.0.0',
       devEngines: { runtime: { name: 'node' } },
       engines: { npm: '>=8' },
-      scripts: { format: 'prettier --write .', test: 'vitest' },
-      dependencies: { prettier: '^3.0.0', react: '^19.0.0' },
-      'lint-staged': { '*.ts': ['prettier --write', 'eslint --fix'] },
+      scripts: {
+        format: 'prettier --write .',
+        lint: 'eslint .',
+        'eslint:fix': 'eslint --fix .',
+        test: 'vitest',
+      },
+      dependencies: { prettier: '^3.0.0', eslint: '^9.0.0', react: '^19.0.0' },
+      devDependencies: {
+        '@eslint/js': '^9.0.0',
+        '@typescript-eslint/parser': '^8.0.0',
+      },
+      'lint-staged': { '*.ts': ['prettier --write', 'eslint --fix', 'tsc --noEmit'] },
     }),
   );
   await writeFile(
     path.join(dir, '.vscode/settings.json'),
     JSON.stringify({
       'prettier.singleQuote': true,
-      'editor.defaultFormatter': 'esbenp.prettier-vscode',
+      'eslint.enable': true,
+      'editor.defaultFormatter': 'dbaeumer.vscode-eslint',
       'editor.tabSize': 2,
+      'editor.codeActionsOnSave': {
+        'source.fixAll.eslint': true,
+        'source.organizeImports': 'explicit',
+      },
       '[typescript]': {
-        'editor.defaultFormatter': 'esbenp.prettier-vscode',
+        'editor.defaultFormatter': 'dbaeumer.vscode-eslint',
         'editor.tabSize': 4,
         'prettier.singleQuote': true,
+        'editor.codeActionsOnSave': {
+          'source.fixAll.eslint': true,
+          'source.organizeImports': 'explicit',
+        },
       },
       '[javascript]': {
         'editor.defaultFormatter': 'dbaeumer.vscode-eslint',
@@ -128,11 +148,17 @@ test('removes existing Prettier configuration while preserving unrelated setting
   );
   await writeFile(
     path.join(dir, '.vscode/extensions.json'),
-    JSON.stringify({ recommendations: ['esbenp.prettier-vscode', 'other.extension'] }),
+    JSON.stringify({
+      recommendations: ['esbenp.prettier-vscode', 'dbaeumer.vscode-eslint', 'other.extension'],
+      unwantedRecommendations: ['dbaeumer.vscode-eslint', 'another.extension'],
+    }),
   );
   await writeFile(path.join(dir, '.prettierrc.json'), '{}');
   await writeFile(path.join(dir, '.prettierignore'), 'dist\n');
   await writeFile(path.join(dir, 'prettier.config.cjs'), 'module.exports = {};');
+  await writeFile(path.join(dir, '.eslintrc.json'), '{}');
+  await writeFile(path.join(dir, '.eslintignore'), 'dist\n');
+  await writeFile(path.join(dir, 'eslint.config.js'), 'export default [];');
 
   const { created, removed, updated } = await createProject({ projectPath: dir });
   assert.ok(created.includes('.editorconfig'));
@@ -141,9 +167,15 @@ test('removes existing Prettier configuration while preserving unrelated setting
   assert.ok(updated.includes('.vscode/extensions.json'));
   const pkg = JSON.parse(await readFile(path.join(dir, 'package.json'), 'utf8'));
   assert.equal(pkg.prettier, undefined);
+  assert.equal(pkg.eslintConfig, undefined);
+  assert.equal(pkg.eslintIgnore, undefined);
   assert.equal(pkg.scripts.format, 'oxfmt --write .');
+  assert.equal(pkg.scripts.lint, 'oxlint');
+  assert.equal(pkg.scripts['eslint:fix'], undefined);
   assert.equal(pkg.scripts.test, 'vitest');
   assert.equal(pkg.dependencies.prettier, undefined);
+  assert.equal(pkg.dependencies.eslint, undefined);
+  assert.equal(pkg.devDependencies, undefined);
   assert.equal(pkg.dependencies.react, '^19.0.0');
   assert.equal(pkg.packageManager, undefined);
   assert.deepEqual(pkg.devEngines, {
@@ -151,24 +183,38 @@ test('removes existing Prettier configuration while preserving unrelated setting
     packageManager: { name: 'pnpm', version: '>=12.14.0', onFail: 'error' },
   });
   assert.deepEqual(pkg.engines, { npm: '>=8', node: '^24.5.0 || ^22.17.1' });
-  assert.deepEqual(pkg['lint-staged']['*.ts'], ['eslint --fix']);
+  assert.deepEqual(pkg['lint-staged']['*.ts'], ['tsc --noEmit']);
 
   const settings = JSON.parse(await readFile(path.join(dir, '.vscode/settings.json'), 'utf8'));
   assert.equal(settings['prettier.singleQuote'], undefined);
+  assert.equal(settings['eslint.enable'], undefined);
   assert.equal(settings['editor.defaultFormatter'], 'oxc.oxc-vscode');
   assert.equal(settings['editor.tabSize'], 2);
-  assert.deepEqual(settings['[typescript]'], { 'editor.tabSize': 4 });
-  assert.deepEqual(settings['[javascript]'], {
-    'editor.defaultFormatter': 'dbaeumer.vscode-eslint',
+  assert.deepEqual(settings['editor.codeActionsOnSave'], {
+    'source.organizeImports': 'explicit',
   });
+  assert.deepEqual(settings['[typescript]'], {
+    'editor.tabSize': 4,
+    'editor.codeActionsOnSave': { 'source.organizeImports': 'explicit' },
+  });
+  assert.equal(settings['[javascript]'], undefined);
 
   const extensions = JSON.parse(await readFile(path.join(dir, '.vscode/extensions.json'), 'utf8'));
   assert.ok(!extensions.recommendations.includes('esbenp.prettier-vscode'));
+  assert.ok(!extensions.recommendations.includes('dbaeumer.vscode-eslint'));
   assert.ok(extensions.recommendations.includes('other.extension'));
+  assert.deepEqual(extensions.unwantedRecommendations, ['another.extension']);
 
   assert.deepEqual(
     new Set(removed),
-    new Set(['.prettierignore', '.prettierrc.json', 'prettier.config.cjs']),
+    new Set([
+      '.prettierignore',
+      '.prettierrc.json',
+      'prettier.config.cjs',
+      '.eslintrc.json',
+      '.eslintignore',
+      'eslint.config.js',
+    ]),
   );
   for (const file of removed) {
     await assert.rejects(readFile(path.join(dir, file)), { code: 'ENOENT' });

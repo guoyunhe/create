@@ -100,6 +100,7 @@ interface VscodeSettings extends JsonRecord {
 
 interface VscodeExtensions extends JsonRecord {
   recommendations?: string[];
+  unwantedRecommendations?: string[];
 }
 
 function asRecord(value: unknown, description: string): JsonRecord {
@@ -229,10 +230,12 @@ async function fileExists(filePath: string) {
   }
 }
 
-async function removePrettierConfig(projectPath: string, packageJson: PackageJson) {
+async function removeLegacyLintConfig(projectPath: string, packageJson: PackageJson) {
   const removed: string[] = [];
   const updated: string[] = [];
   delete packageJson.prettier;
+  delete packageJson.eslintConfig;
+  delete packageJson.eslintIgnore;
 
   for (const field of [
     'dependencies',
@@ -243,14 +246,18 @@ async function removePrettierConfig(projectPath: string, packageJson: PackageJso
     const dependencies = packageJson[field];
     if (!dependencies) continue;
     for (const name of Object.keys(dependencies)) {
-      if (/(^|[-/])prettier($|[-/])/i.test(name)) delete dependencies[name];
+      if (/(^|[-/])prettier($|[-/])/i.test(name) || /eslint/i.test(name)) {
+        delete dependencies[name];
+      }
     }
     if (Object.keys(dependencies).length === 0) delete packageJson[field];
   }
 
   if (packageJson.scripts) {
     for (const [name, command] of Object.entries(packageJson.scripts)) {
-      if (/prettier/i.test(name) || /\bprettier\b/i.test(command)) delete packageJson.scripts[name];
+      if (/prettier|eslint/i.test(name) || /\b(?:prettier|eslint)\b/i.test(command)) {
+        delete packageJson.scripts[name];
+      }
     }
   }
 
@@ -259,9 +266,9 @@ async function removePrettierConfig(projectPath: string, packageJson: PackageJso
     for (const [pattern, commands] of Object.entries(lintStaged)) {
       let remaining: string[];
       if (Array.isArray(commands)) {
-        remaining = commands.filter((command) => !/\bprettier\b/i.test(command));
+        remaining = commands.filter((command) => !/\b(?:prettier|eslint)\b/i.test(command));
       } else {
-        remaining = /\bprettier\b/i.test(commands) ? [] : [commands];
+        remaining = /\b(?:prettier|eslint)\b/i.test(commands) ? [] : [commands];
       }
       if (remaining.length === 0) {
         delete lintStaged[pattern];
@@ -275,7 +282,11 @@ async function removePrettierConfig(projectPath: string, packageJson: PackageJso
   for (const file of await readdir(projectPath, { withFileTypes: true })) {
     if (
       file.isFile() &&
-      (/^\.prettier/i.test(file.name) || /^prettier\.config\./i.test(file.name))
+      (/^\.prettier/i.test(file.name) ||
+        /^prettier\.config\./i.test(file.name) ||
+        /^\.eslintrc(?:\.|$)/i.test(file.name) ||
+        /^\.eslintignore$/i.test(file.name) ||
+        /^eslint\.config(?:\.|$)/i.test(file.name))
     ) {
       await unlink(path.join(projectPath, file.name));
       removed.push(file.name);
@@ -294,32 +305,60 @@ async function removePrettierConfig(projectPath: string, packageJson: PackageJso
     const settings = await readJson<VscodeSettings>(settingsPath, {});
     let settingsChanged = false;
     for (const key of Object.keys(settings)) {
-      if (/^prettier(?:\.|$)/i.test(key)) {
+      if (/^(?:prettier|eslint)(?:\.|$)/i.test(key)) {
         delete settings[key];
         settingsChanged = true;
       }
-      if (!/^(?:\[[^\]]+\])+$/.test(key)) continue;
+      if (key === 'editor.codeActionsOnSave' || /^(?:\[[^\]]+\])+$/.test(key)) {
+        const value = settings[key];
+        if (!(value instanceof Object) || Array.isArray(value)) continue;
 
-      const value = settings[key];
-      if (!(value instanceof Object) || Array.isArray(value)) continue;
+        const nestedSettings = value as JsonRecord;
+        const codeActions =
+          key === 'editor.codeActionsOnSave'
+            ? nestedSettings
+            : nestedSettings['editor.codeActionsOnSave'];
+        if (codeActions instanceof Object && !Array.isArray(codeActions)) {
+          for (const action of Object.keys(codeActions)) {
+            if (/^source\.fixAll\.eslint$/i.test(action)) {
+              delete (codeActions as JsonRecord)[action];
+              settingsChanged = true;
+            }
+          }
+          if (Object.keys(codeActions).length === 0) {
+            if (key === 'editor.codeActionsOnSave') {
+              delete settings[key];
+            } else {
+              delete nestedSettings['editor.codeActionsOnSave'];
+            }
+            settingsChanged = true;
+          }
+        }
 
-      const languageSettings = value as JsonRecord;
-      for (const languageSetting of Object.keys(languageSettings)) {
-        if (
-          /^prettier(?:\.|$)/i.test(languageSetting) ||
-          (languageSetting === 'editor.defaultFormatter' &&
-            /prettier/i.test(String(languageSettings[languageSetting] || '')))
-        ) {
-          delete languageSettings[languageSetting];
+        if (!/^(?:\[[^\]]+\])+$/.test(key)) continue;
+        for (const languageSetting of Object.keys(nestedSettings)) {
+          if (
+            /^(?:prettier|eslint)(?:\.|$)/i.test(languageSetting) ||
+            (languageSetting === 'editor.defaultFormatter' &&
+              /(?:prettier|dbaeumer\.vscode-eslint)/i.test(
+                String(nestedSettings[languageSetting] || ''),
+              ))
+          ) {
+            delete nestedSettings[languageSetting];
+            settingsChanged = true;
+          }
+        }
+        if (Object.keys(nestedSettings).length === 0) {
+          delete settings[key];
           settingsChanged = true;
         }
       }
-      if (Object.keys(languageSettings).length === 0) {
-        delete settings[key];
-        settingsChanged = true;
-      }
     }
-    if (/prettier/i.test(String(settings['editor.defaultFormatter'] || ''))) {
+    if (
+      /(?:prettier|dbaeumer\.vscode-eslint)/i.test(
+        String(settings['editor.defaultFormatter'] || ''),
+      )
+    ) {
       delete settings['editor.defaultFormatter'];
       settingsChanged = true;
     }
@@ -332,15 +371,18 @@ async function removePrettierConfig(projectPath: string, packageJson: PackageJso
   if (vscodeFiles.includes('extensions.json')) {
     const extensionsPath = path.join(vscodePath, 'extensions.json');
     const extensions = await readJson<VscodeExtensions>(extensionsPath, {});
-    if (extensions.recommendations) {
-      const recommendations = extensions.recommendations.filter(
-        (extension) => !/prettier/i.test(extension),
-      );
-      if (recommendations.length !== extensions.recommendations.length) {
-        extensions.recommendations = recommendations;
-        await writeJson(extensionsPath, extensions);
-        updated.push('.vscode/extensions.json');
+    let extensionsChanged = false;
+    for (const field of ['recommendations', 'unwantedRecommendations'] as const) {
+      if (!extensions[field]) continue;
+      const filtered = extensions[field].filter((extension) => !/prettier|eslint/i.test(extension));
+      if (filtered.length !== extensions[field].length) {
+        extensions[field] = filtered;
+        extensionsChanged = true;
       }
+    }
+    if (extensionsChanged) {
+      await writeJson(extensionsPath, extensions);
+      updated.push('.vscode/extensions.json');
     }
   }
 
@@ -385,7 +427,7 @@ export async function createProject({
     version: '0.0.0',
     private: true,
   });
-  const { removed, updated: cleaned } = await removePrettierConfig(projectPath, packageJson);
+  const { removed, updated: cleaned } = await removeLegacyLintConfig(projectPath, packageJson);
   for (const file of cleaned) {
     if (!updated.includes(file)) updated.push(file);
   }
