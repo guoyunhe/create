@@ -78,13 +78,35 @@ for (const file of created) p.log.success(`${messages.created}: ${file}`);
 for (const file of updated) p.log.success(`${messages.updated}: ${file}`);
 
 if (deps.length > 0 && !noInstall && (await confirm(messages.installDependencies))) {
-  p.log.info(messages.installing);
-  const result = spawnSync(options.packageManager, installArgs(options.packageManager, deps), {
-    cwd: projectPath,
-    stdio: 'inherit',
-    shell: process.platform === 'win32',
-  });
-  if (result.status !== 0) console.error(messages.installFailed);
+  let canInstall = true;
+  if (options.packageManager === 'pnpm') {
+    p.log.info(messages.updatingPnpm);
+    const result = spawnSync('pnpm', ['self-update', '--yes'], {
+      cwd: projectPath,
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    });
+    if (result.status !== 0) {
+      if (result.error) console.error(result.error);
+      console.error(messages.pnpmUpdateFailed);
+      process.exitCode = result.status ?? 1;
+      canInstall = false;
+    }
+  }
+
+  if (canInstall) {
+    p.log.info(messages.installing);
+    const args = installArgs(options.packageManager, deps);
+    if (options.packageManager === 'pnpm') {
+      args.push('--config.strict-dep-builds=false');
+    }
+    const result = spawnSync(options.packageManager, args, {
+      cwd: projectPath,
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    });
+    if (result.status !== 0) console.error(messages.installFailed);
+  }
 }
 
 p.outro(messages.done);

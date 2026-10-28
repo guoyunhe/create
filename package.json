@@ -35,7 +35,6 @@
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint",
-    "preinstall": "pnpm self-update --yes",
     "prepare": "husky",
     "prepublishOnly": "pnpm build",
     "test": "node --test \"src/**/*.test.ts\"",

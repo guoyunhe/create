@@ -10,6 +10,8 @@ export interface Messages {
   oxlintJsxA11yConfig: string;
   enableStylelint: string;
   installDependencies: string;
+  updatingPnpm: string;
+  pnpmUpdateFailed: string;
   installing: string;
   installFailed: string;
   cancelled: string;
@@ -28,6 +30,8 @@ export const en: Messages = {
   oxlintJsxA11yConfig: 'jsx-a11y accessibility rules',
   enableStylelint: 'Enable Stylelint for CSS?',
   installDependencies: 'Install dependencies now?',
+  updatingPnpm: 'Updating pnpm...',
+  pnpmUpdateFailed: 'Failed to update pnpm. Dependencies were not installed.',
   installing: 'Installing dependencies...',
   installFailed: 'Failed to install dependencies. Please install them manually.',
   cancelled: 'Operation cancelled.',
@@ -46,6 +50,8 @@ export const zh: Messages = {
   oxlintJsxA11yConfig: 'jsx-a11y 可访问性规则',
   enableStylelint: '启用 CSS 的 Stylelint？',
   installDependencies: '现在安装依赖？',
+  updatingPnpm: '正在更新 pnpm……',
+  pnpmUpdateFailed: 'pnpm 更新失败，已跳过依赖安装。',
   installing: '正在安装依赖……',
   installFailed: '依赖安装失败，请手动安装。',
   cancelled: '操作已取消。',
