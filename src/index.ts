@@ -34,11 +34,13 @@ export function createOxlintConfig(configs: readonly OxlintConfig[]) {
   const optionalImports = configs.map((config) => OXLINT_CONFIG_IMPORTS[config]).join('\n');
   const extendsValue = [
     'recommended',
+    'recommendedUnicorn',
     ...configs.map((config) => OXLINT_CONFIG_PRESETS[config]),
   ].join(', ');
 
   return `import { defineConfig } from 'oxlint';
 import recommended from 'oxlint-config-recommended';
+import recommendedUnicorn from 'oxlint-config-recommended/unicorn';
 ${optionalImports}${optionalImports ? '\n' : ''}
 export default defineConfig({
   extends: [${extendsValue}],

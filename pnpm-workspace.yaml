@@ -1,4 +1,4 @@
 allowBuilds:
   esbuild: false
 minimumReleaseAgeExclude:
-  - oxlint-config-recommended@1.0.0 || 1.1.0
+  - oxlint-config-recommended@1.0.0 || 1.1.0 || 1.2.0

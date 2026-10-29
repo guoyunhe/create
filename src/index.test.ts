@@ -92,6 +92,7 @@ test('creates all configuration files', async () => {
   const oxlintConfig = await readFile(path.join(dir, 'oxlint.config.ts'), 'utf8');
   assert.match(oxlintConfig, /oxlint-config-recommended\/react/);
   assert.match(oxlintConfig, /oxlint-config-recommended\/jsx-a11y/);
+  assert.match(oxlintConfig, /oxlint-config-recommended\/unicorn/);
   const settings = JSON.parse(await readFile(path.join(dir, '.vscode/settings.json'), 'utf8'));
   assert.equal(settings['oxc.enable'], true);
   assert.equal(settings['editor.codeActionsOnSave']['source.fixAll.oxc'], 'always');
@@ -259,6 +260,7 @@ test('includes only selected optional oxlint presets', async () => {
   const oxlintConfig = await readFile(path.join(dir, 'oxlint.config.ts'), 'utf8');
   assert.match(oxlintConfig, /oxlint-config-recommended\/react/);
   assert.doesNotMatch(oxlintConfig, /jsx-a11y/);
+  assert.match(oxlintConfig, /oxlint-config-recommended\/unicorn/);
 });
 
 test('detects package manager and locale', () => {
