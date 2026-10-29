@@ -1,14 +1,11 @@
 import { access, mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises';
-import module from 'node:module';
 import path from 'node:path';
 import process from 'node:process';
 
 import { parse as parseSemver } from 'semver';
 
-export const EDITORCONFIG = await readFile(
-  module.createRequire(import.meta.url).resolve('@guoyunhe/editorconfig/node/.editorconfig'),
-  'utf8',
-);
+const EDITORCONFIG_URL =
+  'https://raw.githubusercontent.com/guoyunhe/editorconfig/refs/heads/main/node/.editorconfig';
 
 export const OXFMT_CONFIG = `import { defineConfig } from 'oxfmt';
 import preset from '@guoyunhe/oxfmt-config';
@@ -134,14 +131,22 @@ function isDate(value: unknown): value is string {
   );
 }
 
-async function fetchJson(url: string): Promise<unknown> {
+async function fetchResponse(url: string) {
   const response = await globalThis.fetch(url, {
     signal: globalThis.AbortSignal.timeout(10_000),
   });
   if (!response.ok) {
     throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
   }
-  return response.json() as Promise<unknown>;
+  return response;
+}
+
+async function fetchJson(url: string): Promise<unknown> {
+  return fetchResponse(url).then((response) => response.json()) as Promise<unknown>;
+}
+
+async function fetchText(url: string): Promise<string> {
+  return fetchResponse(url).then((response) => response.text());
 }
 
 async function getRuntimeRequirements() {
@@ -195,15 +200,19 @@ async function getRuntimeRequirements() {
     .filter(({ releaseDate, isEol }) => releaseDate <= today && !isEol)
     // filter() creates a local array, so sorting it cannot mutate the API response.
     // oxlint-disable-next-line unicorn/no-array-sort
-    .sort((a, b) => b.cycle - a.cycle);
+    .sort((a, b) => a.cycle - b.cycle);
 
-  if (supportedReleases.length === 0) {
+  const latestSupportedRelease = supportedReleases.at(-1);
+  if (!latestSupportedRelease) {
     throw new Error('Node.js API returned no supported, non-EOL releases');
   }
 
   return {
     pnpmVersion,
-    nodeVersionRange: supportedReleases.map(({ latest }) => `^${latest}`).join(' || '),
+    nodeVersionRange: [
+      ...supportedReleases.map(({ cycle }) => `^${cycle}.0.0`),
+      `>=${latestSupportedRelease.cycle + 1}.0.0`,
+    ].join(' || '),
   };
 }
 
@@ -461,8 +470,7 @@ export async function createProject({
   };
 
   if (editorconfig) {
-    deps.push('@guoyunhe/editorconfig');
-    await write('.editorconfig', EDITORCONFIG);
+    await write('.editorconfig', await fetchText(EDITORCONFIG_URL));
   }
 
   if (oxfmt) {

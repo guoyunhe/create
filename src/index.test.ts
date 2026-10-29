@@ -4,7 +4,9 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, mock, test } from 'node:test';
 
-import { createProject, detectPackageManager, EDITORCONFIG } from './index.ts';
+import { satisfies } from 'semver';
+
+import { createProject, detectPackageManager } from './index.ts';
 import { getMessages, zh, en } from './messages.ts';
 
 beforeEach(() => {
@@ -12,6 +14,12 @@ beforeEach(() => {
     const url = input instanceof globalThis.Request ? input.url : String(input);
     if (url === 'https://registry.npmjs.org/pnpm/latest') {
       return globalThis.Response.json({ version: '12.14.0' });
+    }
+    if (
+      url ===
+      'https://raw.githubusercontent.com/guoyunhe/editorconfig/refs/heads/main/node/.editorconfig'
+    ) {
+      return new globalThis.Response('root = true\n');
     }
     if (url === 'https://endoflife.date/api/v1/products/nodejs') {
       return globalThis.Response.json({
@@ -30,10 +38,16 @@ beforeEach(() => {
               latest: { name: '24.5.0' },
             },
             {
-              name: '21',
-              releaseDate: '2023-10-17',
+              name: '25',
+              releaseDate: '2025-10-15',
               isEol: true,
-              latest: { name: '21.7.3' },
+              latest: { name: '25.0.0' },
+            },
+            {
+              name: '26',
+              releaseDate: '2026-04-01',
+              isEol: false,
+              latest: { name: '26.0.0' },
             },
             {
               name: '27',
@@ -69,7 +83,10 @@ test('creates all configuration files', async () => {
     version: '>=12.14.0',
     onFail: 'error',
   });
-  assert.equal(pkg.engines.node, '^24.5.0 || ^22.17.1');
+  assert.equal(pkg.engines.node, '^22.0.0 || ^24.0.0 || ^26.0.0 || >=27.0.0');
+  assert.equal(satisfies('25.0.0', pkg.engines.node), false);
+  assert.equal(satisfies('26.0.0', pkg.engines.node), true);
+  assert.equal(satisfies('30.0.0', pkg.engines.node), true);
   assert.equal(pkg.packageManager, undefined);
   assert.ok(pkg['lint-staged']);
   assert.ok(!deps.includes('stylelint'));
@@ -84,10 +101,11 @@ test('creates all configuration files', async () => {
     'oxfmt --write',
   );
   assert.ok(deps.includes('@guoyunhe/oxfmt-config'));
+  assert.ok(!deps.includes('@guoyunhe/editorconfig'));
   assert.ok(deps.includes('oxlint'));
   assert.ok(deps.includes('oxlint-config-recommended'));
   assert.match(await readFile(path.join(dir, '.husky/pre-commit'), 'utf8'), /lint-staged/);
-  assert.equal(await readFile(path.join(dir, '.editorconfig'), 'utf8'), EDITORCONFIG);
+  assert.equal(await readFile(path.join(dir, '.editorconfig'), 'utf8'), 'root = true\n');
   await readFile(path.join(dir, 'oxfmt.config.ts'));
   const oxlintConfig = await readFile(path.join(dir, 'oxlint.config.ts'), 'utf8');
   assert.match(oxlintConfig, /oxlint-config-recommended\/react/);
@@ -185,7 +203,10 @@ test('removes existing Prettier and ESLint configuration while preserving unrela
     runtime: { name: 'node' },
     packageManager: { name: 'pnpm', version: '>=12.14.0', onFail: 'error' },
   });
-  assert.deepEqual(pkg.engines, { npm: '>=8', node: '^24.5.0 || ^22.17.1' });
+  assert.deepEqual(pkg.engines, {
+    npm: '>=8',
+    node: '^22.0.0 || ^24.0.0 || ^26.0.0 || >=27.0.0',
+  });
   assert.deepEqual(pkg['lint-staged']['*.ts'], ['tsc --noEmit']);
 
   const settings = JSON.parse(await readFile(path.join(dir, '.vscode/settings.json'), 'utf8'));

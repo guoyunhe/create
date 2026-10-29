@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file.
 
 - Always include the `oxlint-config-recommended/unicorn` preset; keep it out of the optional preset selection.
 
+### Changed
+
+- Download the EditorConfig file directly from GitHub instead of installing `@guoyunhe/editorconfig`.
+
 ## [0.3.2] - 2026-10-28
 
 ### Added
